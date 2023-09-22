@@ -38,20 +38,17 @@ public class HttpServer1{
 		server1.QUEUE_SIZE=100;
 
 		server1.init();
-		Thread.ofVirtual().start(new Runnable() {
+		Thread.ofPlatform().name("SAMPLE SERVER").start(new Runnable() {
 			public void run () {
 				server1.await();
 			}
 		});
 		try {
-			Thread.sleep(60000);
+			Thread.sleep(6000);
 			server1.shutdown();
 		} catch (InterruptedException | IOException e) {
 			e.printStackTrace();
 		}
-
-
-
 	}
 	/**
 	* This method waits for a request from a client, generates ServletRequest, ServletResponse objects
@@ -59,6 +56,7 @@ public class HttpServer1{
 	*/
 	public void await(){
 		RequestHandler requestHandler = null;
+		System.out.println("STARTING "+Thread.currentThread().getName());
 		while(!this.shutdown && started)
 		{
 			Socket socket = null;
@@ -71,7 +69,7 @@ public class HttpServer1{
 				e.printStackTrace();
 			}
 		}
-		
+		System.out.println("ENDING "+Thread.currentThread().getName());
 	}
 	
 	/**
@@ -99,7 +97,8 @@ public class HttpServer1{
 		this.serverSocket.close();
 		this.serverSocket =null;
 
-		this.exec.shutdown();
+		// forcibly terminate
+		this.exec.shutdownNow();
 		this.exec.close();
 		this.exec = null;
 
