@@ -21,41 +21,47 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.*;
 
 public class HttpServer1{
-	
-	
-	private boolean shutdown = false;
-	
+
+	private volatile Boolean shutdown = false;
+	private Integer PORT;
+	private String HOST;
+	private int QUEUE_SIZE;
+	private boolean started = false;
+	private volatile ServerSocket serverSocket;
+	private volatile ThreadPoolExecutor exec ;
+	private BlockingQueue<Runnable> requestQueue ;
 	public static void main(String[] args)
 	{
 		HttpServer1 server1 = new HttpServer1();
-		server1.await();
+		server1.PORT = 8080;
+		server1.HOST="127.0.0.1";
+		server1.QUEUE_SIZE=100;
+
+		server1.init();
+		Thread.ofVirtual().start(new Runnable() {
+			public void run () {
+				server1.await();
+			}
+		});
+		try {
+			Thread.sleep(60000);
+			server1.shutdown();
+		} catch (InterruptedException | IOException e) {
+			e.printStackTrace();
+		}
+
+
+
 	}
 	/**
 	* This method waits for a request from a client, generates ServletRequest, ServletResponse objects
 	 * 	and passes them to the servlet.
 	*/
 	public void await(){
-		RequestHandler requestHandler=null;
-		Thread thread = null;
-		ServerSocket serverSocket = null;
-		BlockingQueue<Runnable> requestQueue = new ArrayBlockingQueue<>(100);
-		ThreadPoolExecutor exec = null;
-		try{
-			// the second argument is backlog number of connections to socket.??
-			serverSocket = new ServerSocket(8080,1,InetAddress.getByName("127.0.0.1"));
-			exec = new ThreadPoolExecutor(10,1000,1,TimeUnit.SECONDS,requestQueue, Thread.ofVirtual().factory());
-
-		}catch(IOException ioe){
-
-			ioe.printStackTrace();
-			System.exit(1);
-		}
-		while(true)
+		RequestHandler requestHandler = null;
+		while(!this.shutdown && started)
 		{
 			Socket socket = null;
-			InputStream input = null;
-			OutputStream output = null;
-			
 			try{
 				socket = serverSocket.accept();
 				requestHandler = new RequestHandler(socket);
@@ -63,7 +69,6 @@ public class HttpServer1{
 			}catch(Exception e)
 			{
 				e.printStackTrace();
-				System.exit(1);
 			}
 		}
 		
@@ -73,16 +78,34 @@ public class HttpServer1{
 	*	Starts server starting threads??
 	*/
 	public void init(){
-
+		try {
+			// the second argument is backlog number of connections to socket.??
+			requestQueue =  new ArrayBlockingQueue<>(QUEUE_SIZE);
+			this.serverSocket = new ServerSocket(PORT, 1, InetAddress.getByName(HOST));
+			exec = new ThreadPoolExecutor(10,1000,100,TimeUnit.SECONDS,requestQueue, Thread.ofVirtual().factory());
+			this.started =  true;
+		}catch (Exception e)
+		{
+			e.printStackTrace();
+		}
 	}
 	
 	/**
 	* Shuts down the server making it stop listening for requests and stops all active thread.
 	*/
-	public void shutdown(){
+	public void shutdown() throws IOException {
+		this.shutdown=true;
 
+		this.serverSocket.close();
+		this.serverSocket =null;
 
+		this.exec.shutdown();
+		this.exec.close();
+		this.exec = null;
 
+		requestQueue.clear();
+		this.requestQueue = null;
+		this.started = false;
 	}
 	
 	
